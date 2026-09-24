@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://investhoodprojects.com/endyy/backend/api";
+const API_BASE_URL = "/api";
 
 export async function getServices() {
   const response = await fetch(`${API_BASE_URL}/services.php`);
@@ -21,9 +21,7 @@ export async function getBarbers() {
 }
 
 export async function getBarberServices() {
-  const response = await fetch(
-    `${API_BASE_URL}/barber-services.php`
-  );
+  const response = await fetch(`${API_BASE_URL}/barber-services.php`);
 
   if (!response.ok) {
     throw new Error("Failed to load barber services.");
