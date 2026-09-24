@@ -1,19 +1,58 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { sendContactMessage } from "../services/api";
 
 function Contact() {
-  const [submitted, setSubmitted] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
 
-  const handleSubmit = (event) => {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setSubmitted(true);
+
+    setError("");
+    setSubmitted(false);
+
+    try {
+      setSubmitting(true);
+
+      const data = await sendContactMessage({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        subject,
+        message: message.trim(),
+      });
+
+      if (!data.success) {
+        throw new Error(data.message || "Failed to send your message.");
+      }
+
+      setSubmitted(true);
+
+      setName("");
+      setEmail("");
+      setPhone("");
+      setSubject("");
+      setMessage("");
+    } catch (err) {
+      setError(
+        err.message || "Something went wrong while sending your message."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="contact-page">
-
       {/* HERO */}
-
       <section className="contact-hero">
         <div className="contact-hero-overlay"></div>
 
@@ -27,21 +66,17 @@ function Contact() {
           </h1>
 
           <p>
-            Have a question, need help with a booking or simply want
-            to know more? We're here to help.
+            Have a question, need help with a booking or simply want to know
+            more? We're here to help.
           </p>
         </div>
       </section>
 
-      {/* CONTACT AREA */}
-
+      {/* CONTACT */}
       <section className="contact-section section">
         <div className="section-container contact-grid">
-
           {/* CONTACT DETAILS */}
-
           <div className="contact-details">
-
             <p className="eyebrow">CONTACT US</p>
 
             <h2>
@@ -51,35 +86,29 @@ function Contact() {
             </h2>
 
             <p className="contact-intro">
-              Whether you're looking to book an appointment or have
-              a question about our services, get in touch with
-              The Fade Room.
+              Whether you're looking to book an appointment or have a question
+              about our services, get in touch with The Fade Room.
             </p>
 
             <div className="contact-info-list">
-
               <div className="contact-info-item">
                 <span>PHONE</span>
 
-                <a href="tel:+27123456789">
-                  012 345 6789
-                </a>
+                <a href="tel:+27123456789">012 345 6789</a>
               </div>
 
               <div className="contact-info-item">
                 <span>EMAIL</span>
 
-                <a href="mailto:hello@thefadroom.co.za">
-                  hello@thefadroom.co.za
+                <a href="mailto:hello@thefaderoom.co.za">
+                  hello@thefaderoom.co.za
                 </a>
               </div>
 
               <div className="contact-info-item">
                 <span>LOCATION</span>
 
-                <p>
-                  Pretoria, South Africa
-                </p>
+                <p>Pretoria, South Africa</p>
               </div>
 
               <div className="contact-info-item">
@@ -93,21 +122,13 @@ function Contact() {
                   Sunday: 10:00 - 15:00
                 </p>
               </div>
-
             </div>
-
           </div>
 
-          {/* FORM */}
-
+          {/* CONTACT FORM */}
           <div className="contact-form-wrapper">
-
             {!submitted ? (
-              <form
-                className="contact-form"
-                onSubmit={handleSubmit}
-              >
-
+              <form className="contact-form" onSubmit={handleSubmit}>
                 <div className="contact-form-heading">
                   <p className="eyebrow">SEND A MESSAGE</p>
 
@@ -119,102 +140,88 @@ function Contact() {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="contact-name">
-                    FULL NAME
-                  </label>
+                  <label htmlFor="contact-name">FULL NAME</label>
 
                   <input
                     id="contact-name"
                     type="text"
                     placeholder="Your full name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
                     required
                   />
                 </div>
 
                 <div className="form-row">
-
                   <div className="form-group">
-                    <label htmlFor="contact-email">
-                      EMAIL
-                    </label>
+                    <label htmlFor="contact-email">EMAIL</label>
 
                     <input
                       id="contact-email"
                       type="email"
                       placeholder="you@example.com"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
                       required
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="contact-phone">
-                      PHONE
-                    </label>
+                    <label htmlFor="contact-phone">PHONE</label>
 
                     <input
                       id="contact-phone"
                       type="tel"
                       placeholder="Your phone number"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
                     />
                   </div>
-
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="contact-subject">
-                    SUBJECT
-                  </label>
+                  <label htmlFor="contact-subject">SUBJECT</label>
 
-                  <select id="contact-subject" required>
-                    <option value="">
-                      Select a subject
-                    </option>
-
-                    <option value="booking">
-                      Booking Question
-                    </option>
-
-                    <option value="services">
-                      Services
-                    </option>
-
-                    <option value="general">
-                      General Enquiry
-                    </option>
-
-                    <option value="other">
-                      Other
-                    </option>
+                  <select
+                    id="contact-subject"
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    required
+                  >
+                    <option value="">Select a subject</option>
+                    <option value="booking">Booking Question</option>
+                    <option value="services">Services</option>
+                    <option value="general">General Enquiry</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="contact-message">
-                    MESSAGE
-                  </label>
+                  <label htmlFor="contact-message">MESSAGE</label>
 
                   <textarea
                     id="contact-message"
                     rows="6"
                     placeholder="Write your message..."
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
                     required
                   ></textarea>
                 </div>
 
+                {error && <div className="contact-form-error">{error}</div>}
+
                 <button
                   type="submit"
                   className="primary-button contact-submit"
+                  disabled={submitting}
                 >
-                  Send Message
+                  {submitting ? "Sending..." : "Send Message"}
                 </button>
-
               </form>
             ) : (
               <div className="contact-success">
-
-                <span className="contact-success-icon">
-                  ✓
-                </span>
+                <span className="contact-success-icon">✓</span>
 
                 <p className="eyebrow">MESSAGE SENT</p>
 
@@ -225,8 +232,8 @@ function Contact() {
                 </h3>
 
                 <p>
-                  Thanks for contacting The Fade Room. We'll get
-                  back to you as soon as possible.
+                  Thanks for contacting The Fade Room. We'll get back to you as
+                  soon as possible.
                 </p>
 
                 <button
@@ -235,28 +242,23 @@ function Contact() {
                 >
                   Send Another Message
                 </button>
-
               </div>
             )}
-
           </div>
-
         </div>
       </section>
 
       {/* LOCATION */}
-
       <section className="contact-location">
-
         <div className="contact-location-map">
           <div className="map-placeholder">
             <span>THE FADE ROOM</span>
+
             <p>Pretoria, South Africa</p>
           </div>
         </div>
 
         <div className="contact-location-content">
-
           <p className="eyebrow">COME VISIT US</p>
 
           <h2>
@@ -266,18 +268,15 @@ function Contact() {
           </h2>
 
           <p>
-            Visit The Fade Room for a fresh cut, clean fade and
-            professional grooming experience.
+            Visit The Fade Room for a fresh cut, clean fade and professional
+            grooming experience.
           </p>
 
           <Link to="/booking" className="primary-button">
             Book An Appointment
           </Link>
-
         </div>
-
       </section>
-
     </div>
   );
 }

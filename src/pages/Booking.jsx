@@ -4,10 +4,15 @@ import {
   getServices,
   getBarbers,
   getBarberServices,
+  getBookings, // Make sure this is exported from your api services
   createBooking,
 } from "../services/api";
+import {
+  createGoogleCalendarUrl,
+  downloadCalendarEvent,
+} from "../utils/calendar";
 
-const times = [
+const allTimes = [
   "09:00",
   "10:00",
   "11:00",
@@ -23,6 +28,7 @@ function Booking() {
   const [services, setServices] = useState([]);
   const [barbers, setBarbers] = useState([]);
   const [barberServices, setBarberServices] = useState([]);
+  const [bookedTimes, setBookedTimes] = useState([]);
 
   const [selectedService, setSelectedService] = useState("");
   const [selectedBarber, setSelectedBarber] = useState("");
@@ -36,12 +42,14 @@ function Booking() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const [loadingTimes, setLoadingTimes] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [confirmedBooking, setConfirmedBooking] = useState(null);
 
-  // Load booking data
+  // Load initial booking data (services, barbers, relationships)
   useEffect(() => {
     const loadBookingData = async () => {
       try {
@@ -56,21 +64,16 @@ function Booking() {
           ]);
 
         if (!servicesData.success) {
-          throw new Error(
-            servicesData.message || "Failed to load services."
-          );
+          throw new Error(servicesData.message || "Failed to load services.");
         }
 
         if (!barbersData.success) {
-          throw new Error(
-            barbersData.message || "Failed to load barbers."
-          );
+          throw new Error(barbersData.message || "Failed to load barbers.");
         }
 
         if (!relationshipsData.success) {
           throw new Error(
-            relationshipsData.message ||
-              "Failed to load barber services."
+            relationshipsData.message || "Failed to load barber services."
           );
         }
 
@@ -78,9 +81,7 @@ function Booking() {
         setBarbers(barbersData.barbers || []);
         setBarberServices(relationshipsData.barber_services || []);
       } catch (err) {
-        setError(
-          err.message || "Failed to load booking information."
-        );
+        setError(err.message || "Failed to load booking information.");
       } finally {
         setLoading(false);
       }
@@ -89,7 +90,45 @@ function Booking() {
     loadBookingData();
   }, []);
 
-  // Find selected service
+  // Fetch booked times whenever Barber and Date are selected
+  useEffect(() => {
+    const fetchBookedTimes = async () => {
+      if (!selectedBarber || !selectedDate) {
+        setBookedTimes([]);
+        return;
+      }
+
+      try {
+        setLoadingTimes(true);
+        // Assuming getBookings accepts { barber_id, date } or returns bookings array
+        const response = await getBookings({
+          barber_id: selectedBarber,
+          date: selectedDate,
+        });
+
+        if (response.success && response.bookings) {
+          // Extract just the time strings (e.g., "10:00:00" -> "10:00")
+          const taken = response.bookings.map((b) =>
+            b.booking_time ? b.booking_time.substring(0, 5) : ""
+          );
+          setBookedTimes(taken);
+        } else {
+          setBookedTimes([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch existing bookings:", err);
+        setBookedTimes([]);
+      } finally {
+        setLoadingTimes(false);
+      }
+    };
+
+    fetchBookedTimes();
+    // Clear selected time if date or barber changes
+    setSelectedTime("");
+  }, [selectedBarber, selectedDate]);
+
+  // Find selected service data
   const selectedServiceData = services.find(
     (service) => String(service.id) === String(selectedService)
   );
@@ -105,7 +144,7 @@ function Booking() {
       )
     : [];
 
-  // Reset barber if service changes
+  // Reset barber if service changes and current barber doesn't offer it
   useEffect(() => {
     if (
       selectedBarber &&
@@ -125,6 +164,7 @@ function Booking() {
 
     setError("");
     setSuccess("");
+    setConfirmedBooking(null);
 
     if (!selectedService) {
       setError("Please select a service.");
@@ -143,6 +183,11 @@ function Booking() {
 
     if (!selectedTime) {
       setError("Please select a time.");
+      return;
+    }
+
+    if (bookedTimes.includes(selectedTime)) {
+      setError("This time slot is already booked. Please choose another time.");
       return;
     }
 
@@ -171,16 +216,30 @@ function Booking() {
         throw new Error(data.message || "Failed to create booking.");
       }
 
+      const barberObj = barbers.find(
+        (b) => String(b.id) === String(selectedBarber)
+      );
+
+      // Save details for calendar generation
+      setConfirmedBooking({
+        serviceName: selectedServiceData.name,
+        barberName: barberObj ? barberObj.name : "Barber",
+        customerName: customerName.trim(),
+        bookingDate: selectedDate,
+        bookingTime: selectedTime,
+        durationMinutes: Number(selectedServiceData.duration) || 30,
+      });
+
       setSuccess(
         `Your booking has been submitted successfully. Booking #${data.booking_id}.`
       );
 
-      // Clear form after successful booking
+      // Clear form and update booked times locally to instantly reflect the new booking
+      setBookedTimes((prev) => [...prev, selectedTime]);
       setSelectedService("");
       setSelectedBarber("");
       setSelectedDate("");
       setSelectedTime("");
-
       setCustomerName("");
       setPhone("");
       setEmail("");
@@ -200,16 +259,13 @@ function Booking() {
       {/* HERO */}
       <section className="booking-hero">
         <div className="booking-hero-overlay"></div>
-
         <div className="booking-hero-content">
           <p className="eyebrow">THE FADE ROOM</p>
-
           <h1>
             BOOK YOUR
             <br />
             <span>APPOINTMENT.</span>
           </h1>
-
           <p>
             Choose your service, barber, date and time. We'll take care of the
             rest.
@@ -217,13 +273,12 @@ function Booking() {
         </div>
       </section>
 
-      {/* BOOKING */}
+      {/* BOOKING SECTION */}
       <section className="booking-section section">
         <div className="section-container booking-grid">
           <div className="booking-form-wrapper">
             <div className="booking-heading">
               <p className="eyebrow">RESERVE YOUR CHAIR</p>
-
               <h2>
                 MAKE YOUR
                 <br />
@@ -235,10 +290,9 @@ function Booking() {
               <p>Loading booking information...</p>
             ) : (
               <form className="booking-form" onSubmit={handleSubmit}>
-                {/* SERVICE */}
+                {/* 01. SERVICE */}
                 <div className="form-group">
                   <label htmlFor="service">01. SELECT SERVICE</label>
-
                   <select
                     id="service"
                     value={selectedService}
@@ -250,7 +304,6 @@ function Booking() {
                     required
                   >
                     <option value="">Choose a service</option>
-
                     {services.map((service) => (
                       <option key={service.id} value={service.id}>
                         {service.name} — R{Number(service.price).toFixed(0)}
@@ -259,10 +312,9 @@ function Booking() {
                   </select>
                 </div>
 
-                {/* BARBER */}
+                {/* 02. BARBER */}
                 <div className="form-group">
                   <label htmlFor="barber">02. SELECT BARBER</label>
-
                   <select
                     id="barber"
                     value={selectedBarber}
@@ -279,7 +331,6 @@ function Booking() {
                         ? "Choose a barber"
                         : "Select a service first"}
                     </option>
-
                     {availableBarbers.map((barber) => (
                       <option key={barber.id} value={barber.id}>
                         {barber.name}
@@ -288,10 +339,9 @@ function Booking() {
                   </select>
                 </div>
 
-                {/* DATE */}
+                {/* 03. DATE */}
                 <div className="form-group">
                   <label htmlFor="date">03. SELECT DATE</label>
-
                   <input
                     id="date"
                     type="date"
@@ -306,27 +356,46 @@ function Booking() {
                   />
                 </div>
 
-                {/* TIME */}
+                {/* 04. TIME */}
                 <div className="form-group">
                   <label>04. SELECT TIME</label>
 
+                  {!selectedBarber || !selectedDate ? (
+                    <p className="helper-text" style={{ fontSize: "13px", color: "#888", marginBottom: "10px" }}>
+                      Please select a barber and date first to view available time slots.
+                    </p>
+                  ) : loadingTimes ? (
+                    <p className="helper-text" style={{ fontSize: "13px", color: "#888", marginBottom: "10px" }}>
+                      Checking available times...
+                    </p>
+                  ) : null}
+
                   <div className="time-grid">
-                    {times.map((time) => (
-                      <button
-                        type="button"
-                        key={time}
-                        className={`time-button ${
-                          selectedTime === time ? "selected" : ""
-                        }`}
-                        onClick={() => {
-                          setSelectedTime(time);
-                          setError("");
-                          setSuccess("");
-                        }}
-                      >
-                        {time}
-                      </button>
-                    ))}
+                    {allTimes.map((time) => {
+                      const isBooked = bookedTimes.includes(time);
+                      const isSelected = selectedTime === time;
+
+                      return (
+                        <button
+                          type="button"
+                          key={time}
+                          disabled={isBooked || !selectedBarber || !selectedDate}
+                          className={`time-button ${
+                            isSelected ? "selected" : ""
+                          } ${isBooked ? "booked" : ""}`}
+                          onClick={() => {
+                            if (!isBooked) {
+                              setSelectedTime(time);
+                              setError("");
+                              setSuccess("");
+                            }
+                          }}
+                          title={isBooked ? "This time slot is already taken" : time}
+                        >
+                          {time} {isBooked && "(Booked)"}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <input
@@ -338,33 +407,28 @@ function Booking() {
                   />
                 </div>
 
-                {/* CUSTOMER DETAILS */}
+                {/* 05. CUSTOMER DETAILS */}
                 <div className="customer-details">
                   <div className="form-section-title">
                     <span>05.</span>
-
                     <h3>YOUR DETAILS</h3>
                   </div>
 
                   <div className="form-row">
                     <div className="form-group">
                       <label htmlFor="name">FULL NAME</label>
-
                       <input
                         id="name"
                         type="text"
                         placeholder="Your full name"
                         value={customerName}
-                        onChange={(event) =>
-                          setCustomerName(event.target.value)
-                        }
+                        onChange={(event) => setCustomerName(event.target.value)}
                         required
                       />
                     </div>
 
                     <div className="form-group">
                       <label htmlFor="phone">PHONE NUMBER</label>
-
                       <input
                         id="phone"
                         type="tel"
@@ -378,7 +442,6 @@ function Booking() {
 
                   <div className="form-group">
                     <label htmlFor="email">EMAIL ADDRESS</label>
-
                     <input
                       id="email"
                       type="email"
@@ -391,7 +454,6 @@ function Booking() {
 
                   <div className="form-group">
                     <label htmlFor="notes">SPECIAL REQUEST</label>
-
                     <textarea
                       id="notes"
                       rows="4"
@@ -407,12 +469,9 @@ function Booking() {
                   <input
                     type="checkbox"
                     checked={acceptedTerms}
-                    onChange={(event) =>
-                      setAcceptedTerms(event.target.checked)
-                    }
+                    onChange={(event) => setAcceptedTerms(event.target.checked)}
                     required
                   />
-
                   <span>I agree to The Fade Room's Terms & Conditions.</span>
                 </label>
 
@@ -424,7 +483,46 @@ function Booking() {
                 {/* SUCCESS */}
                 {success && (
                   <div className="booking-message booking-success">
-                    {success}
+                    <p>{success}</p>
+
+                    {confirmedBooking && (
+                      <div
+                        className="calendar-actions"
+                        style={{
+                          marginTop: "15px",
+                          display: "flex",
+                          gap: "10px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <a
+                          href={createGoogleCalendarUrl(confirmedBooking)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="primary-button"
+                          style={{
+                            fontSize: "14px",
+                            padding: "10px 16px",
+                            textDecoration: "none",
+                          }}
+                        >
+                          📅 Add to Google Calendar
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => downloadCalendarEvent(confirmedBooking)}
+                          className="secondary-button"
+                          style={{
+                            fontSize: "14px",
+                            padding: "10px 16px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          📥 Download .ics File
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -444,12 +542,10 @@ function Booking() {
           <aside className="booking-summary">
             <div className="summary-card">
               <p className="eyebrow">YOUR APPOINTMENT</p>
-
               <h3>BOOKING SUMMARY</h3>
 
               <div className="summary-line">
                 <span>Service</span>
-
                 <strong>
                   {selectedServiceData
                     ? selectedServiceData.name
@@ -459,12 +555,10 @@ function Booking() {
 
               <div className="summary-line">
                 <span>Barber</span>
-
                 <strong>
                   {selectedBarber
                     ? barbers.find(
-                        (barber) =>
-                          String(barber.id) === String(selectedBarber)
+                        (barber) => String(barber.id) === String(selectedBarber)
                       )?.name || "Not selected"
                     : "Not selected"}
                 </strong>
@@ -472,19 +566,16 @@ function Booking() {
 
               <div className="summary-line">
                 <span>Date</span>
-
                 <strong>{selectedDate || "Not selected"}</strong>
               </div>
 
               <div className="summary-line">
                 <span>Time</span>
-
                 <strong>{selectedTime || "Not selected"}</strong>
               </div>
 
               <div className="summary-total">
                 <span>Total</span>
-
                 <strong>
                   {selectedServiceData
                     ? `R${Number(selectedServiceData.price).toFixed(0)}`
@@ -500,14 +591,11 @@ function Booking() {
 
             <div className="booking-info">
               <p className="eyebrow">NEED HELP?</p>
-
               <h3>CONTACT THE SHOP</h3>
-
               <p>
                 If you have questions about your booking, contact The Fade Room
                 before submitting your appointment.
               </p>
-
               <a href="tel:+27123456789">012 345 6789</a>
             </div>
           </aside>
