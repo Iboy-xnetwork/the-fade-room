@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost/backend/api";
+const API_BASE_URL = "https://enderprojects.rf.gd/backend/api";
 
 export async function getServices() {
   const response = await fetch(`${API_BASE_URL}/services.php`);
