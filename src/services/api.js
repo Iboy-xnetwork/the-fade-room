@@ -1,4 +1,4 @@
-const API_BASE_URL = "/api";
+const API_BASE_URL = "http://localhost/backend/api";
 
 export async function getServices() {
   const response = await fetch(`${API_BASE_URL}/services.php`);
@@ -44,7 +44,14 @@ export async function createBooking(bookingData) {
     body: JSON.stringify(bookingData),
   });
 
-  const data = await response.json();
+  const text = await response.text();
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    throw new Error("Server error. Please try again.");
+  }
 
   if (!response.ok) {
     throw new Error(data.message || "Failed to create booking.");

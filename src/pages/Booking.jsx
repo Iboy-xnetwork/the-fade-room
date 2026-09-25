@@ -4,13 +4,13 @@ import {
   getServices,
   getBarbers,
   getBarberServices,
-  getBookings, // Make sure this is exported from your api services
+  getBookings,
   createBooking,
 } from "../services/api";
 import {
   createGoogleCalendarUrl,
   downloadCalendarEvent,
-} from "../utils/calendar";
+} from "../utills/calendar";
 
 const allTimes = [
   "09:00",
@@ -24,6 +24,24 @@ const allTimes = [
   "17:00",
 ];
 
+function getToday() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function isTimePast(time, date) {
+  if (date !== getToday()) return false;
+
+  const [hours, minutes] = time.split(":").map(Number);
+  const slot = new Date();
+  slot.setHours(hours, minutes, 0, 0);
+
+  return slot <= new Date();
+}
+
 function Booking() {
   const [services, setServices] = useState([]);
   const [barbers, setBarbers] = useState([]);
@@ -32,7 +50,7 @@ function Booking() {
 
   const [selectedService, setSelectedService] = useState("");
   const [selectedBarber, setSelectedBarber] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(getToday());
   const [selectedTime, setSelectedTime] = useState("");
 
   const [customerName, setCustomerName] = useState("");
@@ -49,7 +67,9 @@ function Booking() {
   const [success, setSuccess] = useState("");
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
-  // Load initial booking data (services, barbers, relationships)
+  const today = getToday();
+
+  // Load services, barbers, relationships
   useEffect(() => {
     const loadBookingData = async () => {
       try {
@@ -90,7 +110,7 @@ function Booking() {
     loadBookingData();
   }, []);
 
-  // Fetch booked times whenever Barber and Date are selected
+  // Fetch booked times when barber + date change
   useEffect(() => {
     const fetchBookedTimes = async () => {
       if (!selectedBarber || !selectedDate) {
@@ -100,14 +120,13 @@ function Booking() {
 
       try {
         setLoadingTimes(true);
-        // Assuming getBookings accepts { barber_id, date } or returns bookings array
+
         const response = await getBookings({
           barber_id: selectedBarber,
           date: selectedDate,
         });
 
         if (response.success && response.bookings) {
-          // Extract just the time strings (e.g., "10:00:00" -> "10:00")
           const taken = response.bookings.map((b) =>
             b.booking_time ? b.booking_time.substring(0, 5) : ""
           );
@@ -124,16 +143,13 @@ function Booking() {
     };
 
     fetchBookedTimes();
-    // Clear selected time if date or barber changes
     setSelectedTime("");
   }, [selectedBarber, selectedDate]);
 
-  // Find selected service data
   const selectedServiceData = services.find(
     (service) => String(service.id) === String(selectedService)
   );
 
-  // Only show barbers who provide the selected service
   const availableBarbers = selectedService
     ? barbers.filter((barber) =>
         barberServices.some(
@@ -144,7 +160,7 @@ function Booking() {
       )
     : [];
 
-  // Reset barber if service changes and current barber doesn't offer it
+  // Reset barber if it no longer matches the selected service
   useEffect(() => {
     if (
       selectedBarber &&
@@ -155,9 +171,6 @@ function Booking() {
       setSelectedBarber("");
     }
   }, [selectedService]);
-
-  // Minimum date = today
-  const today = new Date().toISOString().split("T")[0];
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -181,13 +194,25 @@ function Booking() {
       return;
     }
 
+    if (selectedDate < today) {
+      setError("You cannot book a date in the past.");
+      return;
+    }
+
     if (!selectedTime) {
       setError("Please select a time.");
       return;
     }
 
+    if (isTimePast(selectedTime, selectedDate)) {
+      setError("This time has already passed. Please choose a later time.");
+      return;
+    }
+
     if (bookedTimes.includes(selectedTime)) {
-      setError("This time slot is already booked. Please choose another time.");
+      setError(
+        "This time slot is already booked for the selected barber. Please choose another time or a different barber."
+      );
       return;
     }
 
@@ -220,25 +245,26 @@ function Booking() {
         (b) => String(b.id) === String(selectedBarber)
       );
 
-      // Save details for calendar generation
       setConfirmedBooking({
         serviceName: selectedServiceData.name,
         barberName: barberObj ? barberObj.name : "Barber",
         customerName: customerName.trim(),
         bookingDate: selectedDate,
         bookingTime: selectedTime,
-        durationMinutes: Number(selectedServiceData.duration) || 30,
+        durationMinutes: Number(selectedServiceData.duration_minutes) || 30,
       });
 
       setSuccess(
         `Your booking has been submitted successfully. Booking #${data.booking_id}.`
       );
 
-      // Clear form and update booked times locally to instantly reflect the new booking
+      // Instantly mark this time as booked
       setBookedTimes((prev) => [...prev, selectedTime]);
+
+      // Clear form (keep date as today)
       setSelectedService("");
       setSelectedBarber("");
-      setSelectedDate("");
+      setSelectedDate(getToday());
       setSelectedTime("");
       setCustomerName("");
       setPhone("");
@@ -361,11 +387,26 @@ function Booking() {
                   <label>04. SELECT TIME</label>
 
                   {!selectedBarber || !selectedDate ? (
-                    <p className="helper-text" style={{ fontSize: "13px", color: "#888", marginBottom: "10px" }}>
-                      Please select a barber and date first to view available time slots.
+                    <p
+                      className="helper-text"
+                      style={{
+                        fontSize: "13px",
+                        color: "#888",
+                        marginBottom: "10px",
+                      }}
+                    >
+                      Please select a barber and date first to view available
+                      time slots.
                     </p>
                   ) : loadingTimes ? (
-                    <p className="helper-text" style={{ fontSize: "13px", color: "#888", marginBottom: "10px" }}>
+                    <p
+                      className="helper-text"
+                      style={{
+                        fontSize: "13px",
+                        color: "#888",
+                        marginBottom: "10px",
+                      }}
+                    >
                       Checking available times...
                     </p>
                   ) : null}
@@ -373,26 +414,42 @@ function Booking() {
                   <div className="time-grid">
                     {allTimes.map((time) => {
                       const isBooked = bookedTimes.includes(time);
+                      const isPast = isTimePast(time, selectedDate);
+                      const isDisabled =
+                        isBooked ||
+                        isPast ||
+                        !selectedBarber ||
+                        !selectedDate;
                       const isSelected = selectedTime === time;
 
                       return (
                         <button
                           type="button"
                           key={time}
-                          disabled={isBooked || !selectedBarber || !selectedDate}
+                          disabled={isDisabled}
                           className={`time-button ${
                             isSelected ? "selected" : ""
-                          } ${isBooked ? "booked" : ""}`}
+                          } ${isBooked ? "booked" : ""} ${
+                            isPast ? "past" : ""
+                          }`}
                           onClick={() => {
-                            if (!isBooked) {
+                            if (!isDisabled) {
                               setSelectedTime(time);
                               setError("");
                               setSuccess("");
                             }
                           }}
-                          title={isBooked ? "This time slot is already taken" : time}
+                          title={
+                            isBooked
+                              ? "Already booked"
+                              : isPast
+                              ? "This time has passed"
+                              : time
+                          }
                         >
-                          {time} {isBooked && "(Booked)"}
+                          {time}
+                          {isBooked && " (Booked)"}
+                          {isPast && !isBooked && " (Past)"}
                         </button>
                       );
                     })}
@@ -422,7 +479,9 @@ function Booking() {
                         type="text"
                         placeholder="Your full name"
                         value={customerName}
-                        onChange={(event) => setCustomerName(event.target.value)}
+                        onChange={(event) =>
+                          setCustomerName(event.target.value)
+                        }
                         required
                       />
                     </div>
@@ -469,10 +528,14 @@ function Booking() {
                   <input
                     type="checkbox"
                     checked={acceptedTerms}
-                    onChange={(event) => setAcceptedTerms(event.target.checked)}
+                    onChange={(event) =>
+                      setAcceptedTerms(event.target.checked)
+                    }
                     required
                   />
-                  <span>I agree to The Fade Room's Terms & Conditions.</span>
+                  <span>
+                    I agree to The Fade Room's Terms & Conditions.
+                  </span>
                 </label>
 
                 {/* ERROR */}
@@ -511,7 +574,9 @@ function Booking() {
 
                         <button
                           type="button"
-                          onClick={() => downloadCalendarEvent(confirmedBooking)}
+                          onClick={() =>
+                            downloadCalendarEvent(confirmedBooking)
+                          }
                           className="secondary-button"
                           style={{
                             fontSize: "14px",
@@ -558,7 +623,8 @@ function Booking() {
                 <strong>
                   {selectedBarber
                     ? barbers.find(
-                        (barber) => String(barber.id) === String(selectedBarber)
+                        (barber) =>
+                          String(barber.id) === String(selectedBarber)
                       )?.name || "Not selected"
                     : "Not selected"}
                 </strong>
@@ -593,8 +659,8 @@ function Booking() {
               <p className="eyebrow">NEED HELP?</p>
               <h3>CONTACT THE SHOP</h3>
               <p>
-                If you have questions about your booking, contact The Fade Room
-                before submitting your appointment.
+                If you have questions about your booking, contact The Fade
+                Room before submitting your appointment.
               </p>
               <a href="tel:+27123456789">012 345 6789</a>
             </div>

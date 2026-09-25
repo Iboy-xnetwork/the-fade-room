@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { getBarbers } from "../services/api";
 
 const services = [
   {
@@ -18,32 +20,31 @@ const services = [
   },
 ];
 
-const barbers = [
-  {
-    name: "Thabo Mokoena",
-    role: "Senior Barber",
-    image:
-      "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    name: "Lwazi Ndlovu",
-    role: "Fade Specialist",
-    image:
-      "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=700&q=80",
-  },
-  {
-    name: "Kagiso Molefe",
-    role: "Barber",
-    image:
-      "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=700&q=80",
-  },
-];
-
 function Home() {
+  const [barbers, setBarbers] = useState([]);
+  const [loadingBarbers, setLoadingBarbers] = useState(true);
+
+  useEffect(() => {
+    const loadBarbers = async () => {
+      try {
+        const data = await getBarbers();
+        if (data.success && data.barbers) {
+          // Limit to first 3 or 4 barbers for the home preview grid
+          setBarbers(data.barbers.slice(0, 3));
+        }
+      } catch (err) {
+        console.error("Failed to load barbers for home preview:", err);
+      } finally {
+        setLoadingBarbers(false);
+      }
+    };
+
+    loadBarbers();
+  }, []);
+
   return (
     <div className="home">
       {/* HERO */}
-
       <section className="hero">
         <div className="hero-overlay"></div>
 
@@ -79,7 +80,6 @@ function Home() {
       </section>
 
       {/* INTRO */}
-
       <section className="intro section">
         <div className="section-container intro-grid">
           <div>
@@ -113,7 +113,6 @@ function Home() {
       </section>
 
       {/* STATS */}
-
       <section className="stats">
         <div className="section-container stats-grid">
           <div className="stat">
@@ -139,7 +138,6 @@ function Home() {
       </section>
 
       {/* SERVICES */}
-
       <section className="services-preview section">
         <div className="section-container">
           <div className="section-heading">
@@ -160,8 +158,8 @@ function Home() {
             {services.map((service, index) => (
               <article className="service-card" key={service.name}>
                 <div className="service-number">
-  {String(index + 1).padStart(2, "0")}
-</div>
+                  {String(index + 1).padStart(2, "0")}
+                </div>
 
                 <h3>{service.name}</h3>
 
@@ -178,7 +176,6 @@ function Home() {
       </section>
 
       {/* WHY US */}
-
       <section className="why-us section">
         <div className="section-container why-grid">
           <div className="why-image">
@@ -236,8 +233,7 @@ function Home() {
         </div>
       </section>
 
-      {/* BARBERS */}
-
+      {/* BARBERS (Fetched dynamically from database) */}
       <section className="barbers-preview section">
         <div className="section-container">
           <div className="section-heading">
@@ -255,28 +251,39 @@ function Home() {
           </div>
 
           <div className="barber-grid">
-            {barbers.map((barber) => (
-              <article className="barber-card" key={barber.name}>
-                <div className="barber-image">
-                  <img src={barber.image} alt={barber.name} />
-                </div>
-
-                <div className="barber-info">
-                  <div>
-                    <h3>{barber.name}</h3>
-                    <p>{barber.role}</p>
+            {loadingBarbers ? (
+              <p>Loading barbers...</p>
+            ) : barbers.length === 0 ? (
+              <p>No barbers available.</p>
+            ) : (
+              barbers.map((barber) => (
+                <article className="barber-card" key={barber.id || barber.name}>
+                  <div className="barber-image">
+                    <img
+                      src={
+                        barber.image ||
+                        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=700&q=80"
+                      }
+                      alt={barber.name}
+                    />
                   </div>
 
-                  <span>→</span>
-                </div>
-              </article>
-            ))}
+                  <div className="barber-info">
+                    <div>
+                      <h3>{barber.name}</h3>
+                      <p>{barber.role}</p>
+                    </div>
+
+                    <span>→</span>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </div>
       </section>
 
       {/* FINAL CTA */}
-
       <section className="home-cta">
         <div className="home-cta-overlay"></div>
 

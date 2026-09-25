@@ -12,8 +12,10 @@ function Navbar() {
     <header className="navbar">
       <div className="nav-container">
         <Link to="/" className="logo" onClick={closeMenu}>
-  <img src="/images/logo/logo.png" alt="The Fade Room" />
-</Link>
+          <img src="/images/logo/logo1.png" alt="The Fade Room" />
+          <span>FADE</span>
+          <strong>ROOM</strong>
+        </Link>
 
         <nav className={`nav-links ${menuOpen ? "open" : ""}`}>
           <NavLink to="/" onClick={closeMenu}>

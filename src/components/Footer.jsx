@@ -4,8 +4,11 @@ function Footer() {
   return (
     <footer className="footer">
       <div className="footer-container">
+        
+        {/* Brand */}
         <div className="footer-brand">
           <Link to="/" className="logo">
+            <img src="/images/logo/logo1.png" alt="The Fade Room" />
             <span>FADE</span>
             <strong>ROOM</strong>
           </Link>
@@ -19,6 +22,7 @@ function Footer() {
           </p>
         </div>
 
+        {/* Quick Links */}
         <div className="footer-column">
           <h3>Quick Links</h3>
 
@@ -29,6 +33,7 @@ function Footer() {
           <Link to="/contact">Contact</Link>
         </div>
 
+        {/* Opening Hours */}
         <div className="footer-column">
           <h3>Opening Hours</h3>
 
@@ -37,32 +42,50 @@ function Footer() {
           <p>Sunday: 10:00 - 15:00</p>
         </div>
 
+        {/* Contact */}
         <div className="footer-column">
           <h3>Contact</h3>
 
-          <a href="tel:+27123456789">012 345 6789</a>
+          <a href="tel:+27123456789">
+            012 345 6789
+          </a>
+
           <a href="mailto:hello@thefadroom.co.za">
             hello@thefadroom.co.za
           </a>
 
+          {/* Social Links */}
           <div className="footer-socials">
-            <a href="#" aria-label="Instagram">
+            <a
+              href="https://www.instagram.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+            >
               Instagram
             </a>
 
-            <a href="#" aria-label="Facebook">
+            <a
+              href="https://www.facebook.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+            >
               Facebook
             </a>
           </div>
         </div>
       </div>
 
+      {/* Footer Bottom */}
       <div className="footer-bottom">
         <p>
-          © {new Date().getFullYear()} The Fade Room. All rights reserved.
+          &copy; {new Date().getFullYear()} The Fade Room. All rights reserved.
         </p>
 
-        <Link to="/terms">Terms & Conditions</Link>
+        <Link to="/terms">
+          Terms & Conditions
+        </Link>
       </div>
     </footer>
   );

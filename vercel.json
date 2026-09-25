@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://investhoodprojects.com/endyy/backend/api/:path*"
+      "destination": "http://localhost/backend/api/:path*"
     }
   ]
 }
